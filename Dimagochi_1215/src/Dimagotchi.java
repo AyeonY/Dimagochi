@@ -12,11 +12,14 @@ public class Dimagotchi {
     private int feedCount;
     private int playCount;
     private int sleepCount;
-    private int cleanCount; // 💡 [추가] 청소 횟수
+    private int cleanCount; 
     
-    private int evolLevel=0; // 💡 [추가] 진화 레벨 필드
+    private int evolLevel=0; 
     
-    private int coins; // 💡 [추가] 코인 시스템
+    private int coins; 
+    
+    private int hygiene; // 청결도 (0~100)
+    private int flyCount; // 현재 있는 벌레 수
     
     private Character character; // Character 객체 추가
     
@@ -27,15 +30,15 @@ public class Dimagotchi {
         this.energy = 100;
         this.causeOfDeath ="";
         this.count = 0;
-        this.isEvolved = false; // 초기화
-        this.evolutionMessage = ""; // 초기화
+        this.isEvolved = false; 
+        this.evolutionMessage = ""; 
         
         this.feedCount = 0;
         this.playCount = 0;
         this.sleepCount = 0;
-        this.cleanCount = 0; // 💡 초기화
+        this.cleanCount = 0; 
         
-        this.coins = 0; // 💡 초기 코인 0개로 시작
+        this.coins = 0; //  초기 코인 0개로 시작
         
      // Character 객체 초기화 (DimagotchiGUI의 화면 크기 800x500 고려)
         this.character = new Character(350, 300);
@@ -97,6 +100,8 @@ public class Dimagotchi {
         this.happiness = Math.min(100, happiness + 10);
         this.energy = Math.max(0, energy - 10);
         
+        this.hygiene = 100;
+        
         this.cleanCount++;
         passTime();
         
@@ -109,6 +114,17 @@ public class Dimagotchi {
     	this.count++;
         this.hunger -= 5;
         this.happiness -= 5;
+        
+        // 벌레가 있으면 청결도가 떨어짐
+        if (flyCount > 0) {
+            this.hygiene = Math.max(0, this.hygiene - (flyCount * 2));
+        }
+        
+        // 청결도가 낮으면 행복도가 추가로 떨어짐 (악취 패널티)
+        if (this.hygiene < 50) {
+            this.happiness -= 2;
+        }
+        
         checkStatus();
         checkEvolution(); // 진화 여부 확인
     }
@@ -159,6 +175,7 @@ public class Dimagotchi {
         System.out.println(" 배고픔: " + drawBar(hunger, true));
         System.out.println(" 행복도: " + drawBar(happiness, false));
         System.out.println(" 에너지: " + drawBar(energy, false));
+        System.out.println(" 청결도: " + drawBar(100 - hygiene, true));
         System.out.println("-------------------------");
     }
 
@@ -183,7 +200,7 @@ public class Dimagotchi {
     public int getFeedCount() { return feedCount; }
     public int getPlayCount() { return playCount; }
     public int getSleepCount() { return sleepCount; }
-    public int getCleanCount() { return cleanCount; } // 💡 [추가] Getter
+    public int getCleanCount() { return cleanCount; } //  Getter
     
     public int getHunger() { return hunger; }
     public int getHappiness() { return happiness; }
@@ -196,7 +213,7 @@ public class Dimagotchi {
     public String getEvolutionMessage() { return evolutionMessage; } // 진화 메시지 Getter
     public void resetEvolutionMessage() { this.evolutionMessage = ""; } // 메시지 초기화
     
-    // 💡 [추가] 코인 관련 메서드
+    // 코인 관련 메서드
     public int getCoins() { return coins; }
     
     public boolean spendCoins(int amount) {
@@ -209,6 +226,28 @@ public class Dimagotchi {
     
     public void addCoins(int amount) {
         coins += amount;
+}
+    
+    // 벌레 및 청결도 관련 메서드
+    public int getHygiene() { return hygiene; }
+    
+    public void addFly() {
+        this.flyCount++;
+        // 벌레가 늘어나면 청결도가 즉시 조금 깎임
+        this.hygiene = Math.max(0, hygiene - 5);
     }
+    
+    public String catchFly() {
+        if (flyCount > 0) {
+            flyCount--;
+            // 벌레를 잡으면 청결도 약간 회복 및 코인 획득(보너스)
+            hygiene = Math.min(100, hygiene + 5);
+            addCoins(5); 
+            return "벌레를 잡았다! (5G 획득)";
+        }
+        return "";
+    }
+    
+    public int getFlyCount() { return flyCount; }
 
 }

@@ -7,6 +7,10 @@ import java.io.IOException;
 import javax.imageio.ImageIO; 
 import java.util.Map;
 import java.util.HashMap;
+import java.util.List;          
+import java.util.ArrayList;    
+import java.awt.event.MouseAdapter; 
+import java.awt.event.MouseEvent;  
 
 public class DimagotchiGUI extends JFrame {
 
@@ -18,7 +22,7 @@ public class DimagotchiGUI extends JFrame {
     private JLabel imageLabel;
     private JLabel statusLabel;
     
-    private JButton btnFeed, btnPlay, btnSleep, btnClean; // 💡 [추가] btnClean
+    private JButton btnFeed, btnPlay, btnSleep, btnClean; 
     private JTabbedPane actionTabs;
 
     private StatusGaugePanel hungerGauge;
@@ -36,11 +40,14 @@ public class DimagotchiGUI extends JFrame {
     private boolean fortuneCookieActive = false; // 포춘쿠키 활성화 여부
     private boolean fortunePaperActive = false; // 운세 종이 활성화 여부
     
-    private JPanel coinPanel; // 💡 [추가] 코인 패널
-    private JLabel coinLabel; // 💡 [추가] 코인 라벨
+    private JPanel coinPanel; //  코인 패널
+    private JLabel coinLabel; //  코인 라벨
     
-    private JPanel crystalBallPanel; // 💡 [추가] 수정구 패널 (운세 시스템)
-    private JPanel tvPanel; // 💡 [추가] TV 패널 (미니게임)
+    private JPanel crystalBallPanel; // 수정구 패널 (운세 시스템)
+    private JPanel tvPanel; //  TV 패널 (미니게임)
+    
+    private List<Fly> flyList = new ArrayList<>();
+    private Timer flySpawnTimer;
 
     public DimagotchiGUI() {
         String name = JOptionPane.showInputDialog("다마고치 이름을 입력하세요:");
@@ -99,14 +106,14 @@ public class DimagotchiGUI extends JFrame {
         ItemInfo info = itemMap.get(itemId);
         if (info == null) return;
         
-        // 💡 [추가] 코인 체크 및 차감
+        // 코인 체크 및 차감
         if (!pet.spendCoins(price)) {
             JOptionPane.showMessageDialog(this, "코인이 부족합니다! 현재 코인: " + pet.getCoins() + "G", "구매 실패", JOptionPane.WARNING_MESSAGE);
             return;
         }
 
         addItemToBackground(info);
-        updateUI(); // 💡 코인 표시 업데이트
+        updateUI(); // 코인 표시 업데이트
         
         JOptionPane.showMessageDialog(this, info.imagePath + "를 구매했습니다! 배경에 배치됩니다.");
     }
@@ -148,7 +155,7 @@ public class DimagotchiGUI extends JFrame {
         imageLabel.setSize(100, 100);
         mainPanel.add(imageLabel);
         
-        // [추가] 포춘쿠키 패널 초기화 (보이지 않게 설정)
+        // 포춘쿠키 패널 초기화 (보이지 않게 설정)
         fortuneCookiePanel = new JPanel();
         fortuneCookiePanel.setLayout(null);
         fortuneCookiePanel.setSize(80, 80);
@@ -156,7 +163,7 @@ public class DimagotchiGUI extends JFrame {
         fortuneCookiePanel.setVisible(false);
         mainPanel.add(fortuneCookiePanel);
 
-        // [추가] 운세 종이 패널 초기화 (보이지 않게 설정)
+        // 운세 종이 패널 초기화 (보이지 않게 설정)
         fortunePaperPanel = new JPanel();
         fortunePaperPanel.setLayout(null);
         fortunePaperPanel.setSize(400, 300);
@@ -202,7 +209,7 @@ public class DimagotchiGUI extends JFrame {
         
         mainPanel.add(statsPanel);
         
-        // 💡 [추가] 코인 패널 초기화 (우측 상단)
+        // 코인 패널 초기화 (우측 상단)
         coinPanel = new JPanel();
         coinPanel.setLayout(new FlowLayout(FlowLayout.CENTER, 5, 5));
         coinPanel.setBounds(580, 20, 200, 50);
@@ -229,7 +236,7 @@ public class DimagotchiGUI extends JFrame {
         
         mainPanel.add(coinPanel);
         
-        // 💡 [추가] 수정구 패널 초기화 (왼쪽 중간, 상태바 아래)
+        // 수정구 패널 초기화 (왼쪽 중간, 상태바 아래)
         crystalBallPanel = new JPanel();
         crystalBallPanel.setLayout(new BorderLayout());
         crystalBallPanel.setBounds(40, 200, 100, 100);
@@ -256,7 +263,7 @@ public class DimagotchiGUI extends JFrame {
         
         mainPanel.add(crystalBallPanel);
         
-        // 💡 [추가] TV 패널 초기화 (오른쪽 중간, 코인 아래)
+        // TV 패널 초기화 (오른쪽 중간, 코인 아래)
         tvPanel = new JPanel();
         tvPanel.setLayout(new BorderLayout());
         tvPanel.setBounds(620, 150, 120, 100);
@@ -285,7 +292,7 @@ public class DimagotchiGUI extends JFrame {
         
         JPanel btnPanel = new JPanel();
         btnPanel.setLayout(new FlowLayout(FlowLayout.CENTER, 10, 10)); // 간격 조정
-        // 💡 [수정] 버튼 4개가 들어가도록 패널 너비 조정 (450 -> 560) 및 위치 조정 (173 -> 120)
+        // 버튼 4개가 들어가도록 패널 너비 조정 (450 -> 560) 및 위치 조정 (173 -> 120)
         btnPanel.setBounds(120, 400, 560, 60); 
         btnPanel.setOpaque(false);
 
@@ -348,15 +355,69 @@ public class DimagotchiGUI extends JFrame {
         mainPanel.setComponentZOrder(backgroundLabel, mainPanel.getComponentCount() - 1);
         
         add(mainPanel, BorderLayout.CENTER);
-
-        movementTimer = new Timer(1000, e -> {
+        
+     // 💡 [추가] 벌레 스폰 타이머 (10초마다 확률적으로 생성)
+        flySpawnTimer = new Timer(10000, e -> {
             if (Dimagotchi.isAliveStatic()) {
+                // 30% 확률로 벌레 등장 (최대 5마리 제한)
+                if (Math.random() < 0.3 && flyList.size() < 5) {
+                    spawnVisualFly();
+                }
+            }
+        });
+        flySpawnTimer.start();
+
+        movementTimer = new Timer(100, e -> { // 이동 속도 조정 (1000 -> 100)
+            if (Dimagotchi.isAliveStatic()) {
+                 // 기존 캐릭터 업데이트 (느리게 하기 위해 카운터 사용 가능하지만, 일단 둡니다)
+                 // 캐릭터가 너무 빨리 움직이면 여기를 조정하세요.
                  pet.getCharacter().updateMovement();
+                 
+                 // 벌레 움직임 업데이트
+                 updateFlies();
+                 
                  updateBackground(); 
             }
             updateUI(); 
         });
         movementTimer.start(); 
+    }
+    
+    // 벌레 생성 및 GUI 추가 메서드
+    private void spawnVisualFly() {
+        Fly fly = new Fly();
+        
+        // 벌레 클릭(잡기) 이벤트 리스너
+        fly.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                // 잡기 로직
+                String msg = pet.catchFly(); // 데이터 처리
+                statusLabel.setText(msg);
+                
+                // 화면에서 제거
+                mainPanel.remove(fly);
+                flyList.remove(fly);
+                mainPanel.repaint();
+            }
+        });
+        
+        flyList.add(fly);
+        mainPanel.add(fly);
+        pet.addFly(); // 데이터에 벌레 추가
+        
+        // Z-Order 조정 (캐릭터보다 위에 오도록)
+        mainPanel.setComponentZOrder(fly, 0); 
+        
+        statusLabel.setText("윙윙~ 벌레가 나타났어요! 클릭해서 잡으세요!");
+        mainPanel.repaint();
+    }
+    
+    // 벌레 위치 업데이트 메서드
+    private void updateFlies() {
+        for (Fly fly : flyList) {
+            fly.updatePosition();
+        }
     }
     
     private void styleButton(JButton button) {
@@ -383,9 +444,11 @@ public class DimagotchiGUI extends JFrame {
             case 1: message = pet.feed(); break;
             case 2: message = pet.play(); break;
             case 3: message = pet.sleep(); break;
-            case 4: message = pet.clean(); break; 
+            case 4: 
+                message = pet.clean(); 
+                break; 
         }
-     // 💡 [수정] 진화 메시지가 있으면 포춘쿠키 표시
+     //  진화 메시지가 있으면 포춘쿠키 표시
         String evolutionMsg = pet.getEvolutionMessage();
         if (!evolutionMsg.isEmpty()) {
             message = "<html><center>" + message + "<br><span style='color:magenta;font-weight:bold;'>" + evolutionMsg + "</span></center></html>";
@@ -399,7 +462,7 @@ public class DimagotchiGUI extends JFrame {
         updateUI();
     }
 
-    // 💡 [추가] 포춘쿠키 표시 메서드
+    // 포춘쿠키 표시 메서드
     private void showFortuneCookie() {
         try {
             java.net.URL imgURL = getClass().getResource("/res/fortunecookie.png"); // 경로 주의 (/res)
@@ -446,7 +509,7 @@ public class DimagotchiGUI extends JFrame {
         }
     }
 
-    // 💡 [추가] 포춘쿠키 클릭 시
+    //  포춘쿠키 클릭 시
     private void onFortuneCookieClicked() {
         if (!fortuneCookieActive) return;
         
@@ -459,7 +522,7 @@ public class DimagotchiGUI extends JFrame {
         showFortunePaper();
     }
 
-    // 💡 [추가] 운세 종이 표시 메서드
+    // 운세 종이 표시 메서드
     private void showFortunePaper() {
         try {
             java.net.URL imgURL = getClass().getResource("/res/fortune.png"); // 경로 주의
@@ -526,7 +589,7 @@ public class DimagotchiGUI extends JFrame {
         }
     }
 
-    // 💡 [추가] 운세 종이 닫기
+    // 운세 종이 닫기
     private void onFortunePaperClicked() {
         if (!fortunePaperActive) return;
         
@@ -537,7 +600,7 @@ public class DimagotchiGUI extends JFrame {
         imageLabel.setVisible(true);
     }
 
-    // 💡 [추가] 랜덤 운세 생성
+    //  랜덤 운세 생성
     private String generateFortune() {
         String[] fortunes = {
             "오늘은 행운이 가득한 날입니다!",
@@ -557,7 +620,7 @@ public class DimagotchiGUI extends JFrame {
         return fortunes[random.nextInt(fortunes.length)];
     }
     
-    // 💡 [추가] 수정구 클릭 이벤트 - 운세 확인 다이얼로그
+    // 수정구 클릭 이벤트 - 운세 확인 다이얼로그
     private void onCrystalBallClicked() {
         int choice = JOptionPane.showOptionDialog(
             this,
@@ -581,7 +644,7 @@ public class DimagotchiGUI extends JFrame {
         }
     }
     
-    // 💡 [추가] TV 클릭 이벤트 - 미니게임 (추후 구현 예정)
+    // TV 클릭 이벤트 - 미니게임 (추후 구현 예정)
     private void onTVClicked() {
         JOptionPane.showMessageDialog(
             this,
@@ -629,12 +692,15 @@ public class DimagotchiGUI extends JFrame {
         hungerGauge.setCurrentValue(fullness); 
         
         int currentHappiness = pet.getHappiness();
+        
+        // 만약 청결도가 낮다면 행복도를 깎아서 보여주는 시각적 효과 (선택사항)
+        // 여기서는 데이터 자체를 passTime에서 깎으므로 그대로 표시합니다.
         happinessGauge.setCurrentValue(currentHappiness); 
 
         int currentEnergy = pet.getEnergy();
         energyGauge.setCurrentValue(currentEnergy);
         
-        // 💡 [추가] 코인 라벨 업데이트
+        // 코인 라벨 업데이트
         if (coinLabel != null) {
             coinLabel.setText("" + pet.getCoins());
         }
@@ -656,6 +722,8 @@ public class DimagotchiGUI extends JFrame {
         
         if (!Dimagotchi.isAliveStatic()) {
             movementTimer.stop();
+            flySpawnTimer.stop();
+            
             if (!statusLabel.getText().contains("밥을 먹지 않습니다")
                     && !statusLabel.getText().contains("반응이 없습니다")
                     && !statusLabel.getText().contains("영원히 잠들었습니다")) {
